@@ -23,6 +23,11 @@ htmlcov/
 node_modules/
 .nuxt/
 .output/
+frontend/dist/
+.vite/
+
+# macOS
+.DS_Store
 
 # IDE
 .vscode/

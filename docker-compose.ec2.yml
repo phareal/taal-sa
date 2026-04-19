@@ -1,0 +1,24 @@
+# ─────────────────────────────────────────────────────────────────
+# docker-compose.ec2.yml — Override EC2 (HTTP uniquement, sans TLS)
+# Usage : docker compose -f docker-compose.yml -f docker-compose.ec2.yml up -d
+# ─────────────────────────────────────────────────────────────────
+
+services:
+
+  nginx:
+    # Remplace le template TLS par la version HTTP uniquement
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/templates/taal-http.conf.template:/etc/nginx/templates/taal.conf.template:ro
+      - nginx_logs:/var/log/nginx
+    # Expose uniquement le port 80 (pas de 443)
+    ports:
+      - "${HTTP_PORT:-80}:80"
+    # Supprime la dépendance aux certs SSL
+    environment:
+      DOMAIN: ${DOMAIN:-localhost}
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost/nginx-health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3

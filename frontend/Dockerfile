@@ -1,59 +1,44 @@
 # ─────────────────────────────────────────────────────────────────
-# Dockerfile — Frontend Nuxt.js 3
-# Multi-stage : base → development → builder → production
+# Dockerfile — Frontend Vite (vanilla JS SPA) → statique nginx
+# Stack : Vite 5 + Tailwind 3 + ApexCharts (pas de framework UI)
+# Multi-stage : base → deps → development | builder → production
+# Production : nginx:alpine, image ~50 MB
 # ─────────────────────────────────────────────────────────────────
 
-# ── Stage 1 : base Node ──────────────────────────────────────────
+# ── Stage 1 : base ───────────────────────────────────────────────
 FROM node:20-alpine AS base
-
-RUN apk add --no-cache libc6-compat curl
-
+RUN apk add --no-cache libc6-compat
 WORKDIR /app
 
-# ── Stage 2 : développement (hot-reload HMR) ─────────────────────
-FROM base AS development
+# ── Stage 2 : deps ───────────────────────────────────────────────
+FROM base AS deps
+COPY package.json package-lock.json ./
+RUN npm ci --no-audit --no-fund
 
-COPY package.json package-lock.json* ./
-# npm ci exige un lockfile ; pour un premier scaffold on retombe sur npm install.
-RUN if [ -f package-lock.json ]; then npm ci; else npm install; fi
+# ── Stage 3 : développement (hot-reload Vite) ────────────────────
+FROM deps AS development
+ENV NODE_ENV=development
+EXPOSE 3000
+CMD ["npm", "run", "dev", "--", "--host", "0.0.0.0", "--port", "3000"]
 
-# Le code est monté via volume en dev
-EXPOSE 3000 24678
-CMD ["npm", "run", "dev", "--", "--host", "0.0.0.0"]
-
-# ── Stage 3 : builder (build Nuxt production) ────────────────────
-FROM base AS builder
-
-ARG NUXT_PUBLIC_API_BASE=http://backend:8000
-ENV NUXT_PUBLIC_API_BASE=${NUXT_PUBLIC_API_BASE}
-
-COPY package.json package-lock.json* ./
-RUN if [ -f package-lock.json ]; then npm ci; else npm install; fi
-
-COPY . .
-
-# Build Nuxt (SSR ou static selon nuxt.config.ts)
-RUN npm run build
-
-# ── Stage 4 : production (image Node minimale) ───────────────────
-FROM node:20-alpine AS production
-
+# ── Stage 4 : builder (vite build → dist/) ───────────────────────
+FROM deps AS builder
+ARG VITE_API_BASE=http://localhost:8000
+ENV VITE_API_BASE=${VITE_API_BASE}
+ENV NODE_OPTIONS="--max-old-space-size=2048"
 ENV NODE_ENV=production
 
-RUN apk add --no-cache curl \
-    && addgroup -g 1001 -S nodejs \
-    && adduser -S nuxtjs -u 1001
+COPY index.html postcss.config.js tailwind.config.js vite.config.js ./
+COPY public ./public
+COPY assets ./assets
+COPY src ./src
+RUN npm run build
 
-WORKDIR /app
-
-# Copier uniquement le .output (build Nuxt)
-COPY --from=builder --chown=nuxtjs:nodejs /app/.output ./
-
-USER nuxtjs
-
+# ── Stage 5 : production (nginx statique) ────────────────────────
+FROM nginx:1.25-alpine AS production
+COPY nginx.conf /etc/nginx/conf.d/default.conf
+COPY --from=builder /app/dist /usr/share/nginx/html
 EXPOSE 3000
-
-HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
-    CMD curl -f http://localhost:3000 || exit 1
-
-CMD ["node", "server/index.mjs"]
+HEALTHCHECK --interval=30s --timeout=5s --retries=3 \
+    CMD wget -qO- http://localhost:3000/ || exit 1
+CMD ["nginx", "-g", "daemon off;"]

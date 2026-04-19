@@ -1,11 +1,12 @@
 # Frontend .dockerignore
 node_modules/
-.nuxt/
-.output/
 dist/
+.vite/
 .env
 *.env
 .git
 .gitignore
 *.log
 README.md
+Dockerfile
+.dockerignore
