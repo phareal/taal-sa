@@ -19,6 +19,7 @@ class KpiOut(BaseModel):
     mois_num: int | None
     ca_total: int
     nb_bl: int
+    nb_clients: int
     volume_m3: float
     poids_kg: float
     marge_fcfa: int | None
@@ -83,6 +84,7 @@ async def get_kpis(
             select(
                 func.coalesce(func.sum(Connaissement.docs_fees_fcfa), 0).label("ca_total"),
                 func.count(Connaissement.id).label("nb_bl"),
+                func.count(func.distinct(Connaissement.client_id)).label("nb_clients"),
                 func.coalesce(func.sum(Connaissement.volume_m3), 0).label("volume_m3"),
                 func.coalesce(func.sum(Connaissement.poids_kg), 0).label("poids_kg"),
                 func.sum(Connaissement.marge_fcfa).label("marge_fcfa"),
@@ -98,6 +100,7 @@ async def get_kpis(
         mois_num=mois_num,
         ca_total=ca_total,
         nb_bl=nb_bl,
+        nb_clients=int(row.nb_clients or 0),
         volume_m3=float(row.volume_m3 or 0),
         poids_kg=float(row.poids_kg or 0),
         marge_fcfa=int(row.marge_fcfa) if row.marge_fcfa is not None else None,

@@ -156,16 +156,25 @@ export async function renderHome(root) {
         </div>
       </div>
 
-      <!-- Summary strip -->
+      <!-- Summary strip — toutes les valeurs reflètent le filtre actif (sauf "Années d'activité" qui est cumulatif par design) -->
       <div class="stat-strip">
-        <div class="strip-item"><div class="strip-val">${fmt.compact(globalCA)}</div><div class="strip-label">CA Total FCFA (toutes années)</div></div>
-        <div class="strip-item"><div class="strip-val">${globalBL.toLocaleString("fr-FR")}</div><div class="strip-label">Expéditions totales</div></div>
-        <div class="strip-item"><div class="strip-val">${topClients?.length ? topClients.length + "+" : "—"}</div><div class="strip-label">Clients actifs (top)</div></div>
+        <div class="strip-item">
+          <div class="strip-val">${fmt.compact(kpiCurrent?.ca_total)}</div>
+          <div class="strip-label">CA FCFA (${escapeHtml(blPeriodShort)})</div>
+        </div>
+        <div class="strip-item">
+          <div class="strip-val">${(kpiCurrent?.nb_bl ?? 0).toLocaleString("fr-FR")}</div>
+          <div class="strip-label">Expéditions (${escapeHtml(blPeriodShort)})</div>
+        </div>
+        <div class="strip-item">
+          <div class="strip-val">${kpiCurrent?.nb_clients ?? "—"}</div>
+          <div class="strip-label">Clients actifs (${escapeHtml(blPeriodShort)})</div>
+        </div>
         <div class="strip-item">
           <div class="strip-val">${kpiCurrent?.taux_marge_moyen != null ? (kpiCurrent.taux_marge_moyen * 100).toFixed(1) + "%" : "—"}</div>
           <div class="strip-label">Taux de marge moyen (${escapeHtml(blPeriodShort)})</div>
         </div>
-        <div class="strip-item"><div class="strip-val">${nbAnnees}</div><div class="strip-label">Années d'activité</div></div>
+        <div class="strip-item"><div class="strip-val">${nbAnnees}</div><div class="strip-label">Années d'activité (cumul)</div></div>
       </div>
 
       <!-- KPI cards -->
