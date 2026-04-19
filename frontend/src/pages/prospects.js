@@ -8,12 +8,14 @@ const PRIORITES = ["P1", "P2", "P3"];
 const STATUTS_RELANCE = ["À RELANCER", "RELANCÉ", "EN ATTENTE"];
 
 let CLIENTS_CACHE = null;
+let CLIENTS_BY_ID = new Map();
 async function loadClients() {
   if (CLIENTS_CACHE) return CLIENTS_CACHE;
   try {
     const data = await api.get("/api/clients/", { params: { page: 1, page_size: 500 } });
     CLIENTS_CACHE = data.items ?? [];
-  } catch (_) { CLIENTS_CACHE = []; }
+    CLIENTS_BY_ID = new Map(CLIENTS_CACHE.map(c => [c.id, c]));
+  } catch (_) { CLIENTS_CACHE = []; CLIENTS_BY_ID = new Map(); }
   return CLIENTS_CACHE;
 }
 
@@ -32,11 +34,19 @@ export async function renderProspects(root) {
       const params = { page: state.page, page_size: PAGE_SIZE };
       if (state.priorite) params.priorite = state.priorite;
       if (state.statut_relance) params.statut_relance = state.statut_relance;
-      state.data = await api.get("/api/prospects/", { params });
+      const [data] = await Promise.all([
+        api.get("/api/prospects/", { params }),
+        loadClients(),
+      ]);
+      state.data = data;
       setQuery({ page: state.page !== 1 ? state.page : "", priorite: state.priorite, statut_relance: state.statut_relance });
     } catch (_) {
       state.data = { items: [], total: 0, pages: 0 };
     } finally { state.loading = false; draw(); }
+  }
+
+  function clientName(id) {
+    return CLIENTS_BY_ID.get(id)?.nom || `#${id}`;
   }
 
   function draw() {
@@ -69,7 +79,7 @@ export async function renderProspects(root) {
             <tbody>
               ${rows.map(p => `
                 <tr>
-                  <td style="color:var(--text); font-weight:500;">${escapeHtml(p.client_nom ?? p.client?.nom ?? `#${p.client_id}`)}</td>
+                  <td style="color:var(--text); font-weight:500;">${escapeHtml(clientName(p.client_id))}</td>
                   <td>${escapeHtml(p.type_statut ?? "—")}</td>
                   <td>${statutBadge(p.priorite)}</td>
                   <td class="gold-text">${fmt.fcfa(p.ca_pic_fcfa)}</td>
@@ -106,7 +116,7 @@ export async function renderProspects(root) {
         const id = btn.getAttribute("data-id");
         const row = rows.find(r => r.id == id);
         if (btn.getAttribute("data-act") === "edit") openForm(row);
-        else confirmDelete({ label: row?.client_nom || `#${row?.client_id}`, onConfirm: async () => { await api.del(`/api/prospects/${id}`); load(); } });
+        else confirmDelete({ label: clientName(row?.client_id), onConfirm: async () => { await api.del(`/api/prospects/${id}`); load(); } });
       });
     });
   }
