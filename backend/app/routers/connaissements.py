@@ -10,6 +10,22 @@ from app.schemas.connaissement import ConnaissementCreate, ConnaissementOut, Con
 router = APIRouter(prefix="/api/connaissements", tags=["connaissements"])
 
 
+def _apply_marge(bl: Connaissement) -> None:
+    """
+    Recalcule marge_fcfa et taux_marge à partir de docs_fees et montant_normal.
+    Source de vérité côté backend — toute valeur fournie par le client est écrasée.
+    """
+    docs = bl.docs_fees_fcfa
+    mn = bl.montant_normal_fcfa
+    if docs is None or mn is None:
+        bl.marge_fcfa = None
+        bl.taux_marge = None
+        return
+    marge = docs - mn
+    bl.marge_fcfa = marge
+    bl.taux_marge = round(marge / mn, 4) if mn else None
+
+
 @router.get("/", response_model=Paginated[ConnaissementOut])
 async def list_connaissements(
     page: int = Query(1, ge=1),
@@ -50,7 +66,11 @@ async def list_connaissements(
 
 @router.post("/", response_model=ConnaissementOut, status_code=201)
 async def create_connaissement(data: ConnaissementCreate, db: AsyncSession = Depends(get_db)):
-    bl = Connaissement(**data.model_dump())
+    payload = data.model_dump()
+    payload.pop("marge_fcfa", None)
+    payload.pop("taux_marge", None)
+    bl = Connaissement(**payload)
+    _apply_marge(bl)
     db.add(bl)
     await db.commit()
     await db.refresh(bl)
@@ -72,8 +92,12 @@ async def update_connaissement(
     bl = await db.get(Connaissement, bl_id)
     if not bl:
         raise HTTPException(404, detail="Connaissement introuvable")
-    for k, v in data.model_dump(exclude_unset=True).items():
+    updates = data.model_dump(exclude_unset=True)
+    updates.pop("marge_fcfa", None)
+    updates.pop("taux_marge", None)
+    for k, v in updates.items():
         setattr(bl, k, v)
+    _apply_marge(bl)
     await db.commit()
     await db.refresh(bl)
     return bl

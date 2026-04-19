@@ -187,8 +187,8 @@ export async function renderConnaissements(root) {
             <div><label class="form-label">Montant normal</label><input name="montant_normal_fcfa" class="form-input" type="number" value="${form.montant_normal_fcfa ?? ""}" /></div>
           </div>
           <div class="grid grid-cols-2 gap-3">
-            <div><label class="form-label">Marge (FCFA)</label><input name="marge_fcfa" class="form-input" type="number" value="${form.marge_fcfa ?? ""}" /></div>
-            <div><label class="form-label">Taux de marge</label><input name="taux_marge" class="form-input" type="number" step="0.001" value="${form.taux_marge ?? ""}" /></div>
+            <div><label class="form-label">Marge (FCFA) <span style="opacity:.6;font-weight:400;">(auto)</span></label><input name="marge_fcfa" class="form-input" type="number" value="${form.marge_fcfa ?? ""}" readonly tabindex="-1" style="background:var(--surface-muted,#f3f4f6);" /></div>
+            <div><label class="form-label">Taux de marge <span style="opacity:.6;font-weight:400;">(auto)</span></label><input name="taux_marge" class="form-input" type="number" step="0.0001" value="${form.taux_marge ?? ""}" readonly tabindex="-1" style="background:var(--surface-muted,#f3f4f6);" /></div>
           </div>
           <div><label class="form-label">Notes</label><textarea name="notes" class="form-input" rows="3">${escapeHtml(form.notes ?? "")}</textarea></div>
           <p id="bl-err" class="form-error" style="display:none;"></p>
@@ -202,6 +202,25 @@ export async function renderConnaissements(root) {
         const submit = overlay.querySelector("[data-submit]");
         const formEl = overlay.querySelector("#bl-form");
         const errEl  = overlay.querySelector("#bl-err");
+
+        const docsInput = formEl.querySelector('[name="docs_fees_fcfa"]');
+        const mnInput   = formEl.querySelector('[name="montant_normal_fcfa"]');
+        const margeInput = formEl.querySelector('[name="marge_fcfa"]');
+        const tauxInput  = formEl.querySelector('[name="taux_marge"]');
+        const recalcMarge = () => {
+          const docs = docsInput.value === "" ? null : Number(docsInput.value);
+          const mn   = mnInput.value === ""   ? null : Number(mnInput.value);
+          if (docs == null || mn == null || Number.isNaN(docs) || Number.isNaN(mn)) {
+            margeInput.value = "";
+            tauxInput.value = "";
+            return;
+          }
+          const marge = docs - mn;
+          margeInput.value = marge;
+          tauxInput.value = mn ? Math.round((marge / mn) * 10000) / 10000 : "";
+        };
+        docsInput.addEventListener("input", recalcMarge);
+        mnInput.addEventListener("input", recalcMarge);
 
         submit.addEventListener("click", async (e) => {
           e.preventDefault();

@@ -154,7 +154,7 @@ export async function renderCotations(root) {
           <div class="grid grid-cols-3 gap-3">
             <div><label class="form-label">Offre transitaire</label><input name="offre_transitaire" type="number" step="0.01" class="form-input" value="${f.offre_transitaire ?? ""}" /></div>
             <div><label class="form-label">Cotation client</label><input name="cotation_client" type="number" step="0.01" class="form-input" value="${f.cotation_client ?? ""}" /></div>
-            <div><label class="form-label">Marge</label><input name="marge" type="number" step="0.01" class="form-input" value="${f.marge ?? ""}" /></div>
+            <div><label class="form-label">Marge <span style="opacity:.6;font-weight:400;">(auto)</span></label><input name="marge" type="number" step="0.01" class="form-input" value="${f.marge ?? ""}" readonly tabindex="-1" style="background:var(--surface-muted,#f3f4f6);" /></div>
           </div>
           <div class="grid grid-cols-2 gap-3">
             <div><label class="form-label">Devise</label>
@@ -187,6 +187,22 @@ export async function renderCotations(root) {
         <button class="btn-primary" data-submit>${isEdit ? "Mettre à jour" : "Créer"}</button>
       `,
       onMount: (overlay, close) => {
+        const formEl = overlay.querySelector("#cot-form");
+        const offreInput = formEl.querySelector('[name="offre_transitaire"]');
+        const cotInput   = formEl.querySelector('[name="cotation_client"]');
+        const margeInput = formEl.querySelector('[name="marge"]');
+        const recalc = () => {
+          const o = offreInput.value === "" ? null : Number(offreInput.value);
+          const c = cotInput.value === "" ? null : Number(cotInput.value);
+          if (o == null || c == null || Number.isNaN(o) || Number.isNaN(c)) {
+            margeInput.value = "";
+            return;
+          }
+          margeInput.value = Math.round((c - o) * 100) / 100;
+        };
+        offreInput.addEventListener("input", recalc);
+        cotInput.addEventListener("input", recalc);
+
         overlay.querySelector("[data-submit]").addEventListener("click", async (e) => {
           e.preventDefault();
           const fd = new FormData(overlay.querySelector("#cot-form"));

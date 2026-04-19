@@ -12,6 +12,16 @@ from app.schemas.cotation import CotationCreate, CotationOut, CotationUpdate
 router = APIRouter(prefix="/api/cotations", tags=["cotations"])
 
 
+def _apply_marge(cotation: Cotation) -> None:
+    """
+    marge = cotation_client − offre_transitaire.
+    Source de vérité backend : toute valeur client est écrasée.
+    """
+    o = cotation.offre_transitaire
+    c = cotation.cotation_client
+    cotation.marge = (c - o) if (o is not None and c is not None) else None
+
+
 async def _auto_numero(db: AsyncSession, annee: int) -> str:
     """Génère le prochain numéro COT-YYYY-NNN pour l'année donnée."""
     count = (
@@ -65,11 +75,13 @@ async def list_cotations(
 @router.post("/", response_model=CotationOut, status_code=201)
 async def create_cotation(data: CotationCreate, db: AsyncSession = Depends(get_db)):
     body = data.model_dump()
+    body.pop("marge", None)
     # Auto-numérotation si absent
     if not body.get("numero_cotation"):
         annee = (data.date_cotation or date.today()).year
         body["numero_cotation"] = await _auto_numero(db, annee)
     cotation = Cotation(**body)
+    _apply_marge(cotation)
     db.add(cotation)
     await db.commit()
     await db.refresh(cotation)
@@ -91,8 +103,11 @@ async def update_cotation(
     cotation = await db.get(Cotation, cotation_id)
     if not cotation:
         raise HTTPException(404, detail="Cotation introuvable")
-    for k, v in data.model_dump(exclude_unset=True).items():
+    updates = data.model_dump(exclude_unset=True)
+    updates.pop("marge", None)
+    for k, v in updates.items():
         setattr(cotation, k, v)
+    _apply_marge(cotation)
     await db.commit()
     await db.refresh(cotation)
     return cotation

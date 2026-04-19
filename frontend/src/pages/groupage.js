@@ -18,6 +18,63 @@ async function loadNavires() {
   return NAVIRES_CACHE;
 }
 
+function openNavireModal(onCreated) {
+  let escCapture;
+  openModal({
+    title: "Nouveau navire",
+    onClose: () => {
+      if (escCapture) document.removeEventListener("keydown", escCapture, true);
+    },
+    bodyHTML: `
+      <form id="nv-quick-form" class="flex flex-col gap-3">
+        <div><label class="form-label">Nom *</label><input name="nom" class="form-input" required autofocus /></div>
+        <div class="grid grid-cols-2 gap-3">
+          <div><label class="form-label">Compagnie</label><input name="compagnie" class="form-input" /></div>
+          <div><label class="form-label">Code ligne</label><input name="code_ligne" class="form-input" /></div>
+        </div>
+        <label class="flex items-center gap-2" style="font-size:13px; color:var(--text2);">
+          <input type="checkbox" name="actif" checked /> Actif
+        </label>
+        <p id="nv-quick-err" class="form-error" style="display:none;"></p>
+      </form>
+    `,
+    footerHTML: `
+      <button class="btn-ghost" data-modal-close>Annuler</button>
+      <button class="btn-primary" data-submit>Créer</button>
+    `,
+    onMount: (overlay, close) => {
+      const formEl = overlay.querySelector("#nv-quick-form");
+      const err = overlay.querySelector("#nv-quick-err");
+      const submit = overlay.querySelector("[data-submit]");
+      const save = async () => {
+        const fd = new FormData(formEl);
+        const body = {};
+        fd.forEach((v, k) => body[k] = v === "" ? null : v);
+        body.actif = formEl.querySelector('[name="actif"]').checked;
+        if (!body.nom) { err.textContent = "Le nom est obligatoire."; err.style.display = "block"; return; }
+        submit.disabled = true;
+        try {
+          const created = await api.post("/api/navires/", body);
+          onCreated?.(created);
+          close();
+        } catch (e) {
+          err.textContent = e.data?.detail || e.message || "Erreur.";
+          err.style.display = "block";
+          submit.disabled = false;
+        }
+      };
+      submit.addEventListener("click", (e) => { e.preventDefault(); save(); });
+      formEl.addEventListener("submit", (e) => { e.preventDefault(); save(); });
+      setTimeout(() => formEl.querySelector('[name="nom"]')?.focus(), 30);
+
+      escCapture = (e) => {
+        if (e.key === "Escape") { e.stopImmediatePropagation(); close(); }
+      };
+      document.addEventListener("keydown", escCapture, true);
+    },
+  });
+}
+
 export async function renderGroupage(root) {
   const q = getQuery();
   const state = {
@@ -35,11 +92,21 @@ export async function renderGroupage(root) {
       if (state.annee) params.annee = state.annee;
       if (state.statut) params.statut = state.statut;
       if (state.partenaire) params.partenaire = state.partenaire;
-      state.data = await api.get("/api/conteneurs/", { params });
+      const [tcData, _navires] = await Promise.all([
+        api.get("/api/conteneurs/", { params }),
+        loadNavires(),
+      ]);
+      state.data = tcData;
       setQuery({ page: state.page !== 1 ? state.page : "", annee: state.annee, statut: state.statut, partenaire: state.partenaire });
     } catch (_) {
       state.data = { items: [], total: 0, pages: 0 };
     } finally { state.loading = false; draw(); }
+  }
+
+  function navireName(id) {
+    if (id == null) return "—";
+    const n = (NAVIRES_CACHE || []).find(x => x.id === id);
+    return n?.nom ?? "—";
   }
 
   function draw() {
@@ -66,12 +133,13 @@ export async function renderGroupage(root) {
           : rows.length === 0 ? `<div style="padding:32px; text-align:center; color:var(--text3);">Aucun conteneur</div>`
           : `
           <table class="data-table w-full">
-            <thead><tr><th>N° TC</th><th>Type</th><th>Partenaire</th><th>Année</th><th>Mois</th><th>Date arrivée</th><th>Statut</th><th style="text-align:right;">Actions</th></tr></thead>
+            <thead><tr><th>N° TC</th><th>Type</th><th>Navire</th><th>Partenaire</th><th>Année</th><th>Mois</th><th>Date arrivée</th><th>Statut</th><th style="text-align:right;">Actions</th></tr></thead>
             <tbody>
               ${rows.map(c => `
                 <tr>
                   <td style="font-family:'DM Mono',monospace; color:var(--gold2); font-size:11px;">${escapeHtml(c.numero_tc ?? "—")}</td>
                   <td>${escapeHtml(c.type_tc ?? "—")}</td>
+                  <td>${escapeHtml(navireName(c.navire_id))}</td>
                   <td>${escapeHtml(c.partenaire ?? "—")}</td>
                   <td>${c.annee ?? "—"}</td>
                   <td>${escapeHtml(c.mois ?? (c.mois_num ? MOIS[c.mois_num - 1] : "—"))}</td>
@@ -142,10 +210,13 @@ export async function renderGroupage(root) {
           <div class="grid grid-cols-2 gap-3">
             <div><label class="form-label">Partenaire</label><input name="partenaire" class="form-input" value="${escapeHtml(f.partenaire ?? "")}" /></div>
             <div><label class="form-label">Navire</label>
-              <select name="navire_id" class="form-input">
-                <option value="">— Aucun —</option>
-                ${navires.map(n => `<option value="${n.id}" ${String(f.navire_id) === String(n.id) ? "selected" : ""}>${escapeHtml(n.nom)}</option>`).join("")}
-              </select>
+              <div class="flex gap-2">
+                <select name="navire_id" class="form-input" style="flex:1;">
+                  <option value="">— Aucun —</option>
+                  ${navires.map(n => `<option value="${n.id}" ${String(f.navire_id) === String(n.id) ? "selected" : ""}>${escapeHtml(n.nom)}</option>`).join("")}
+                </select>
+                <button type="button" class="btn-ghost" id="gr-navire-new" title="Créer un navire" style="padding:6px 10px;">＋</button>
+              </div>
             </div>
           </div>
           <div class="grid grid-cols-3 gap-3">
@@ -171,6 +242,18 @@ export async function renderGroupage(root) {
         <button class="btn-primary" data-submit>${isEdit ? "Mettre à jour" : "Créer"}</button>
       `,
       onMount: (overlay, close) => {
+        const navireSelect = overlay.querySelector('[name="navire_id"]');
+        overlay.querySelector("#gr-navire-new").addEventListener("click", () => {
+          openNavireModal((created) => {
+            NAVIRES_CACHE = null;
+            const opt = document.createElement("option");
+            opt.value = created.id;
+            opt.textContent = created.nom;
+            opt.selected = true;
+            navireSelect.appendChild(opt);
+          });
+        });
+
         overlay.querySelector("[data-submit]").addEventListener("click", async (e) => {
           e.preventDefault();
           const fd = new FormData(overlay.querySelector("#gr-form"));

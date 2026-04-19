@@ -142,7 +142,7 @@ GET  /health
 - **Shipper** = expéditeur (envoie la marchandise)
 - **Client / Consignataire** = destinataire (reçoit la marchandise) — entités séparées
 - `marge_fcfa` = `docs_fees_fcfa` - `montant_normal_fcfa` (disponible seulement 2026)
-- `taux_marge` = `marge_fcfa / docs_fees_fcfa`
+- `taux_marge` = `marge_fcfa / montant_normal_fcfa` (taux de majoration / markup)
 - Import Excel : détecter automatiquement la feuille par son nom,
   mapper les colonnes par nom (tolérant casse/espaces),
   upsert sur `numero_bl` (conflit → UPDATE, sinon INSERT),

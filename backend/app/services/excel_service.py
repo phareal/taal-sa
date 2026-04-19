@@ -102,32 +102,28 @@ def _compute_marge(
     marge_raw: int | None,
 ) -> tuple[int | None, float | None]:
     """
-    Recalcule marge et taux_marge.
-    - Si montant_normal absent → retourne marge_raw telle quelle
-    - Si docs_fees − montant_normal cohérent → utilise le calcul
-    - Taux plafonné à [0, 1] pour rejeter les valeurs > 100 %
+    Recalcule marge et taux_marge (markup sur montant_normal).
+    - marge = docs_fees − montant_normal
+    - taux_marge = marge / montant_normal (taux de majoration)
+    - Sans montant_normal, on ne peut pas calculer le markup.
     """
     if docs_fees is None or docs_fees == 0:
         return marge_raw, None
-    if montant_normal is None:
-        if marge_raw is not None and 0 < marge_raw <= docs_fees:
-            return marge_raw, round(marge_raw / docs_fees, 4)
+    if montant_normal is None or montant_normal == 0:
         return marge_raw, None
 
     marge_calc = docs_fees - montant_normal
 
-    # Choisir entre calcul et valeur brute
     if marge_raw is None or marge_raw <= 0:
         marge = marge_calc if marge_calc > 0 else None
     else:
-        # Si l'écart est > 5 % → on préfère le calcul
         ecart = abs(marge_calc - marge_raw) / max(abs(marge_calc), 1)
         marge = marge_calc if ecart > 0.05 else marge_raw
 
     if marge is None or marge <= 0 or marge > docs_fees:
         return None, None
 
-    return marge, round(marge / docs_fees, 4)
+    return marge, round(marge / montant_normal, 4)
 
 
 def _synth_bl(navire: str | None, annee: int, idx: int) -> str:

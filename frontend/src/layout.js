@@ -7,6 +7,7 @@ const NAV_ICONS = {
   home:          SVG('<path d="M3 12l9-9 9 9"/><path d="M5 10v10a1 1 0 001 1h4v-6h4v6h4a1 1 0 001-1V10"/>'),
   bl:            SVG('<path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="16" y2="17"/>'),
   container:     SVG('<rect x="3" y="6" width="18" height="13" rx="1"/><line x1="8" y1="6" x2="8" y2="19"/><line x1="12" y1="6" x2="12" y2="19"/><line x1="16" y1="6" x2="16" y2="19"/>'),
+  navire:        SVG('<path d="M2 20a3 3 0 003 2h14a3 3 0 003-2"/><path d="M4 18l-2-7h20l-2 7"/><path d="M12 11V4"/><path d="M8 4h8"/>'),
   clients:       SVG('<path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/>'),
   shippers:      SVG('<path d="M3 17l9 4 9-4"/><path d="M3 12l9 4 9-4"/><path d="M3 7l9-4 9 4-9 4-9-4z"/>'),
   cotations:     SVG('<path d="M20.59 13.41l-7.17 7.17a2 2 0 01-2.83 0L2 12V2h10l8.59 8.59a2 2 0 010 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/>'),
@@ -27,6 +28,7 @@ const NAV_GROUPS = [
     items: [
       { to: "/connaissements", label: "Connaissements", icon: NAV_ICONS.bl },
       { to: "/groupage",       label: "Groupage / TC",  icon: NAV_ICONS.container },
+      { to: "/navires",        label: "Navires",        icon: NAV_ICONS.navire },
       { to: "/clients",        label: "Clients",        icon: NAV_ICONS.clients },
       { to: "/shippers",       label: "Shippers",       icon: NAV_ICONS.shippers },
     ],
@@ -56,6 +58,7 @@ const PAGE_META = {
   "/":               { title: "Vue Globale — Executive Dashboard",    subtitle: "Groupage LCL · 2019–2026" },
   "/connaissements": { title: "Connaissements",                        subtitle: "Gestion des B/L et expéditions" },
   "/groupage":       { title: "Groupage — Conteneurs",                 subtitle: "TC par mois · B/L · Marges · Partenaires" },
+  "/navires":        { title: "Navires",                                subtitle: "Flotte · Compagnies · Lignes" },
   "/clients":        { title: "Clients / Consignataires",              subtitle: "Consignataires enregistrés" },
   "/shippers":       { title: "Shippers — Expéditeurs",                subtitle: "Analyse des performances et statuts" },
   "/cotations":      { title: "Cotations Commerciales",                subtitle: "Pipeline COT · Suivi des opportunités" },

@@ -193,7 +193,12 @@ def seed_from_connaissements(db: Session, xlsx_path: Path) -> dict[str, dict[str
         docs_fees = to_int(row[8])
         montant_normal = to_int(row[9])
         marge = to_int(row[10])
-        taux_marge = to_float(row[11])
+        if marge is None and docs_fees is not None and montant_normal is not None:
+            diff = docs_fees - montant_normal
+            marge = diff if diff > 0 else None
+        taux_marge = None
+        if marge is not None and montant_normal and montant_normal > 0:
+            taux_marge = round(marge / montant_normal, 4)
 
         if navire:
             navires.setdefault(clean_key(navire), navire)
