@@ -25,6 +25,8 @@ class ComptaSummary(BaseModel):
 @router.get("/summary", response_model=ComptaSummary)
 async def get_summary(
     annee: int | None = Query(None),
+    mois: int | None = Query(None, ge=1, le=12),
+    semaine: int | None = Query(None, ge=1, le=53),
     db: AsyncSession = Depends(get_db),
 ) -> ComptaSummary:
     from sqlalchemy import case, extract
@@ -32,6 +34,10 @@ async def get_summary(
     filters = []
     if annee:
         filters.append(extract("year", ComptabiliteEntry.date_op) == annee)
+    if mois:
+        filters.append(extract("month", ComptabiliteEntry.date_op) == mois)
+    if semaine:
+        filters.append(extract("week", ComptabiliteEntry.date_op) == semaine)
 
     rows = (
         await db.execute(
