@@ -6,28 +6,39 @@ Application full-stack dockerisée : **FastAPI** (Python) + **Nuxt.js 3** + **Po
 
 ## Prérequis
 
-| Outil | Version minimum |
-|---|---|
-| Docker | 24+ |
-| Docker Compose | v2.20+ |
-| Make | (optionnel mais recommandé) |
+| Outil | Version minimum | Lien |
+|---|---|---|
+| Docker Desktop | 4.x (Engine 24+) | https://www.docker.com/products/docker-desktop |
+| Git | 2.x | https://git-scm.com |
+| Make *(Linux/Mac)* | — | inclus sur Linux/Mac |
+| PowerShell *(Windows)* | 5.1+ | inclus dans Windows 10/11 |
 
 ---
 
 ## Démarrage rapide
 
-### Option A — Démarrage avec les données incluses (recommandé)
-
-Le dépôt contient un snapshot SQL complet (`postgres/seed.sql`).
-PostgreSQL le charge **automatiquement** au premier démarrage.
+### Linux / macOS
 
 ```bash
-git clone <repo>
-cd taal-docker
-make bootstrap      # ← une seule commande : build + start + données chargées
+git clone git@github.com:phareal/taal-sa.git
+cd taal-sa
+make bootstrap      # build + start + données chargées automatiquement
 ```
 
-Les services seront accessibles immédiatement avec toutes les données :
+### Windows (PowerShell)
+
+```powershell
+git clone git@github.com:phareal/taal-sa.git
+cd taal-sa
+
+# Autoriser les scripts PowerShell (une seule fois)
+Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
+
+# Démarrer avec les données
+.\taal.ps1 bootstrap
+```
+
+Les services sont accessibles immédiatement :
 
 | Service | URL |
 |---|---|
@@ -37,17 +48,16 @@ Les services seront accessibles immédiatement avec toutes les données :
 
 ---
 
-### Option B — Démarrage manuel (développement)
+## Développement (hot-reload)
 
+**Linux / macOS**
 ```bash
-git clone <repo>
-cd taal-docker
+make dev
+```
 
-# Copier et éditer les variables d'environnement
-cp .env.example .env
-nano .env   # → modifier les mots de passe si besoin
-
-make dev    # hot-reload, les données sont chargées depuis seed.sql
+**Windows**
+```powershell
+.\taal.ps1 dev
 ```
 
 Les services sont accessibles sur :
@@ -95,37 +105,26 @@ make prod
 
 ## Commandes disponibles
 
-```bash
-make help              # Liste toutes les commandes
-
-# ── Démarrage ──────────────────────────────────────────────────
-make bootstrap         # Reset complet + démarrage avec seed.sql (après clone)
-make dev               # Démarrer avec hot-reload
-make prod              # Démarrer en production
-make stop              # Arrêter sans supprimer
-make down              # Arrêter et supprimer
-
-# ── Snapshot des données ───────────────────────────────────────
-make snapshot          # Générer postgres/seed.sql depuis la DB courante
-                       # → puis git add postgres/seed.sql && git commit
-
-# ── Base de données ────────────────────────────────────────────
-make migrate           # Appliquer les migrations Alembic
-make export-db         # Backup PostgreSQL → backups/
-make import-db file=backups/monbackup.sql
-
-# ── Seed initial (Excel) ───────────────────────────────────────
-make seed              # Charger backend/data/seed/DASHBOARD-TAAL-SA.xlsx
-make snapshot          # Puis générer seed.sql pour versionner les données
-
-# ── Outils ─────────────────────────────────────────────────────
-make shell-backend     # Shell dans le conteneur Python
-make shell-db          # Shell psql
-make pgadmin           # Démarrer PgAdmin sur :5050
-make logs-nginx        # Logs Nginx
-make test-backend      # Lancer les tests pytest
-make migration-new nom="ajout_colonne_xyz"
-```
+| Action | Linux / macOS | Windows (PowerShell) |
+|---|---|---|
+| Aide | `make help` | `.\taal.ps1 help` |
+| **Démarrer (données incluses)** | `make bootstrap` | `.\taal.ps1 bootstrap` |
+| Dev hot-reload | `make dev` | `.\taal.ps1 dev` |
+| Production | `make prod` | `.\taal.ps1 prod` |
+| Arrêter | `make stop` | `.\taal.ps1 stop` |
+| Supprimer conteneurs | `make down` | `.\taal.ps1 down` |
+| État | `make ps` | `.\taal.ps1 ps` |
+| Logs | `make logs` | `.\taal.ps1 logs` |
+| **Snapshot données** | `make snapshot` | `.\taal.ps1 snapshot` |
+| Seed Excel | `make seed` | `.\taal.ps1 seed` |
+| Migrations | `make migrate` | `.\taal.ps1 migrate` |
+| Nouvelle migration | `make migration-new nom="desc"` | `.\taal.ps1 migration-new -nom "desc"` |
+| Backup DB | `make export-db` | `.\taal.ps1 export-db` |
+| Restaurer backup | `make import-db file=path.sql` | `.\taal.ps1 import-db -file path.sql` |
+| Shell Python | `make shell-backend` | `.\taal.ps1 shell-backend` |
+| Shell psql | `make shell-db` | `.\taal.ps1 shell-db` |
+| PgAdmin | `make pgadmin` | `.\taal.ps1 pgadmin` |
+| Tests | `make test-backend` | `.\taal.ps1 test-backend` |
 
 ---
 
@@ -179,12 +178,18 @@ taal-dashboard/
 Le fichier `DASHBOARD-TAAL-SA.xlsx` placé dans `backend/data/seed/` est chargé par
 un script qui purge les tables puis ré-insère tout (idempotent).
 
+**Linux / macOS**
 ```bash
-make dev-bg     # démarrer les services en arrière-plan
-make seed       # charger le fichier par défaut
-
-# Ou avec un fichier spécifique (chemin dans le conteneur)
+make dev-bg
+make seed
 make seed-file file=/app/data/seed/autre-fichier.xlsx
+```
+
+**Windows**
+```powershell
+.\taal.ps1 dev-bg
+.\taal.ps1 seed
+.\taal.ps1 seed-file -file /app/data/seed/autre-fichier.xlsx
 ```
 
 Ce que fait le seeder :
@@ -231,23 +236,60 @@ sudo certbot certonly --webroot \
 
 ### Certificat auto-signé (dev local)
 
+**Linux / macOS**
 ```bash
 make ssl-local
-# → génère nginx/certs/localhost.crt et localhost.key
+```
+**Windows**
+```powershell
+.\taal.ps1 ssl-local   # nécessite openssl (inclus dans Git for Windows)
+```
+
+---
+
+## Workflow snapshot — Versionner les données
+
+```
+┌──────────────────────────────────────────────────────────┐
+│  Modifier des données  →  make snapshot / .\taal.ps1 snapshot  │
+│  ↓                                                        │
+│  git add postgres/seed.sql && git commit && git push      │
+│  ↓                                                        │
+│  Collègue : git pull && make bootstrap                    │
+└──────────────────────────────────────────────────────────┘
+```
+
+**Linux / macOS**
+```bash
+make snapshot
+git add postgres/seed.sql && git commit -m "chore: mise à jour snapshot" && git push
+```
+**Windows**
+```powershell
+.\taal.ps1 snapshot
+git add postgres/seed.sql
+git commit -m "chore: mise à jour snapshot"
+git push
 ```
 
 ---
 
 ## Sauvegarde automatique (cron)
 
-Ajouter dans la crontab de l'hôte :
+Ajouter dans la crontab de l'hôte (Linux) :
 
 ```bash
 # Backup quotidien à 2h du matin
-0 2 * * * cd /chemin/taal-dashboard && make export-db >> /var/log/taal-backup.log 2>&1
+0 2 * * * cd /chemin/taal-sa && make export-db >> /var/log/taal-backup.log 2>&1
 
 # Nettoyage des backups > 30 jours
-0 3 * * 0 find /chemin/taal-dashboard/backups -mtime +30 -delete
+0 3 * * 0 find /chemin/taal-sa/backups -mtime +30 -delete
+```
+
+Sous Windows, utiliser le **Planificateur de tâches** ou :
+```powershell
+# Backup manuel
+.\taal.ps1 export-db
 ```
 
 ---
@@ -255,19 +297,32 @@ Ajouter dans la crontab de l'hôte :
 ## Dépannage
 
 ### Le backend ne démarre pas
-```bash
-make logs-backend
+**Linux / macOS** : `make logs-backend`
+**Windows** : `.\taal.ps1 logs-backend`
+```
 # Vérifier les variables DATABASE_URL et REDIS_URL dans .env
 ```
 
 ### Migrations échouées
+**Linux / macOS**
 ```bash
 make shell-backend
-alembic history     # voir l'état
+alembic history
+alembic upgrade head
+```
+**Windows**
+```powershell
+.\taal.ps1 shell-backend
+# dans le conteneur :
+alembic history
 alembic upgrade head
 ```
 
-### Réinitialisation complète (⚠️ perd les données)
-```bash
-make reset
+### PowerShell bloqué sur Windows
+```powershell
+Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
 ```
+
+### Réinitialisation complète (⚠️ perd les données)
+**Linux / macOS** : `make reset`
+**Windows** : `.\taal.ps1 reset`
