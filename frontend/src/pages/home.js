@@ -40,7 +40,8 @@ export async function renderHome(root) {
     root.innerHTML = `<div style="color:var(--text3); padding:32px;">Chargement…</div>`;
 
     const yr = filters.annee;
-    // Current/previous KPIs respect month if set
+    // Connaissement n'a pas de date → la semaine ne s'applique qu'à la compta.
+    // mois_num propagé à kpis + top clients ; semaine propagée à compta uniquement.
     const moisQS = filters.mois ? `&mois_num=${filters.mois}` : "";
     const comptaQS = (filters.mois ? `&mois=${filters.mois}` : "")
                   + (filters.semaine ? `&semaine=${filters.semaine}` : "");
@@ -55,7 +56,7 @@ export async function renderHome(root) {
       api.get(`/api/analytics/kpis?annee=${yr - 1}${moisQS}`).catch(() => null),
       api.get(`/api/analytics/ca-annuel`).catch(() => []),
       api.get(`/api/analytics/ca-mensuel?${heatYearsQS}`).catch(() => []),
-      api.get(`/api/analytics/ca-par-client?annee=${yr}&limit=10`).catch(() => []),
+      api.get(`/api/analytics/ca-par-client?annee=${yr}${moisQS}&limit=10`).catch(() => []),
       api.get(`/api/comptabilite/summary?annee=${yr}${comptaQS}`).catch(() => null),
     ]);
 
@@ -115,10 +116,21 @@ export async function renderHome(root) {
     const nbSemaines = isoWeeksInYear(yr);
     const weekOptions = Array.from({ length: nbSemaines }, (_, i) => i + 1);
 
+    // Période complète (filtre header) : annee + mois + semaine si actifs
     const periodLabel = [
       `Année ${yr}`,
       filters.mois ? MOIS_FULL[filters.mois - 1] : "",
       filters.semaine ? `Semaine ${filters.semaine}` : "",
+    ].filter(Boolean).join(" · ");
+
+    // BL n'ont pas de date → semaine non applicable. Libellés KPIs/Top Clients.
+    const blPeriod = filters.mois ? `${MOIS_FULL[filters.mois - 1]} ${yr}` : `${yr}`;
+    const blPeriodShort = filters.mois ? `${yr} · ${MOIS_LABELS[filters.mois - 1]}` : `${yr}`;
+    // Compta a une date → semaine applicable
+    const comptaPeriodShort = [
+      `${yr}`,
+      filters.mois ? MOIS_LABELS[filters.mois - 1] : "",
+      filters.semaine ? `S${filters.semaine}` : "",
     ].filter(Boolean).join(" · ");
 
     root.innerHTML = `
@@ -134,7 +146,7 @@ export async function renderHome(root) {
               <option value="">Tous les mois</option>
               ${MOIS_FULL.map((label, i) => `<option value="${i + 1}" ${filters.mois == i + 1 ? "selected" : ""}>${label}</option>`).join("")}
             </select>
-            <select class="filter-select" data-f="semaine" title="Semaine ISO">
+            <select class="filter-select" data-f="semaine" title="Semaine ISO (compta uniquement — les B/L n'ont pas de date précise)">
               <option value="">Toutes les semaines</option>
               ${weekOptions.map(w => `<option value="${w}" ${filters.semaine == w ? "selected" : ""}>S${w}</option>`).join("")}
             </select>
@@ -151,7 +163,7 @@ export async function renderHome(root) {
         <div class="strip-item"><div class="strip-val">${topClients?.length ? topClients.length + "+" : "—"}</div><div class="strip-label">Clients actifs (top)</div></div>
         <div class="strip-item">
           <div class="strip-val">${kpiCurrent?.taux_marge_moyen != null ? (kpiCurrent.taux_marge_moyen * 100).toFixed(1) + "%" : "—"}</div>
-          <div class="strip-label">Taux de marge moyen (${yr})</div>
+          <div class="strip-label">Taux de marge moyen (${escapeHtml(blPeriodShort)})</div>
         </div>
         <div class="strip-item"><div class="strip-val">${nbAnnees}</div><div class="strip-label">Années d'activité</div></div>
       </div>
@@ -159,22 +171,22 @@ export async function renderHome(root) {
       <!-- KPI cards -->
       <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-5">
         <div class="kpi-card">
-          <div class="kpi-label">Chiffre d'Affaires ${yr}${filters.mois ? " · " + MOIS_LABELS[filters.mois - 1] : ""}</div>
+          <div class="kpi-label">Chiffre d'Affaires ${escapeHtml(blPeriodShort)}</div>
           <div class="kpi-value">${fmt.compact(kpiCurrent?.ca_total)} <span class="kpi-sub">FCFA</span></div>
           ${kpiCurrent && kpiPrev ? `<div class="kpi-delta ${deltaCls(kpiCurrent.ca_total, kpiPrev.ca_total)}">${delta(kpiCurrent.ca_total, kpiPrev.ca_total)} vs ${yr - 1}</div>` : ""}
         </div>
         <div class="kpi-card">
-          <div class="kpi-label">Expéditions ${yr}${filters.mois ? " · " + MOIS_LABELS[filters.mois - 1] : ""}</div>
+          <div class="kpi-label">Expéditions ${escapeHtml(blPeriodShort)}</div>
           <div class="kpi-value">${kpiCurrent?.nb_bl ?? "—"} <span class="kpi-sub">B/L</span></div>
           ${kpiCurrent && kpiPrev ? `<div class="kpi-delta ${deltaCls(kpiCurrent.nb_bl, kpiPrev.nb_bl)}">${delta(kpiCurrent.nb_bl, kpiPrev.nb_bl)} vs ${yr - 1}</div>` : ""}
         </div>
         <div class="kpi-card">
-          <div class="kpi-label">Volume ${yr}${filters.mois ? " · " + MOIS_LABELS[filters.mois - 1] : ""}</div>
+          <div class="kpi-label">Volume ${escapeHtml(blPeriodShort)}</div>
           <div class="kpi-value">${kpiCurrent?.volume_m3 ? kpiCurrent.volume_m3.toFixed(0) : "—"} <span class="kpi-sub">M³</span></div>
           ${kpiCurrent && kpiPrev?.volume_m3 ? `<div class="kpi-delta ${deltaCls(kpiCurrent.volume_m3, kpiPrev.volume_m3)}">${delta(kpiCurrent.volume_m3, kpiPrev.volume_m3)} vs ${yr - 1}</div>` : ""}
         </div>
         <div class="kpi-card">
-          <div class="kpi-label">CA Moy / Expédition ${yr}</div>
+          <div class="kpi-label">CA Moy / Expédition ${escapeHtml(blPeriodShort)}</div>
           <div class="kpi-value">${fmt.compact(kpiCurrent?.ca_moy_par_bl)} <span class="kpi-sub">FCFA</span></div>
           <div class="kpi-delta neutral">↑ Qualité dossiers</div>
         </div>
@@ -183,17 +195,17 @@ export async function renderHome(root) {
       ${compta ? `
       <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-5">
         <div class="kpi-card" style="border-color:rgba(99,153,34,0.3);">
-          <div class="kpi-label">Recettes ${yr}${filters.semaine ? " · S" + filters.semaine : (filters.mois ? " · " + MOIS_LABELS[filters.mois - 1] : "")}</div>
+          <div class="kpi-label">Recettes ${escapeHtml(comptaPeriodShort)}</div>
           <div class="kpi-value" style="color:var(--green); font-size:16px;">${fmt.compact(compta.total_recettes)} <span class="kpi-sub">FCFA</span></div>
           <div class="kpi-delta up">↑ ${compta.nb_recettes} opération(s)</div>
         </div>
         <div class="kpi-card" style="border-color:rgba(226,75,74,0.3);">
-          <div class="kpi-label">Dépenses ${yr}${filters.semaine ? " · S" + filters.semaine : (filters.mois ? " · " + MOIS_LABELS[filters.mois - 1] : "")}</div>
+          <div class="kpi-label">Dépenses ${escapeHtml(comptaPeriodShort)}</div>
           <div class="kpi-value" style="color:var(--red); font-size:16px;">${fmt.compact(compta.total_depenses)} <span class="kpi-sub">FCFA</span></div>
           <div class="kpi-delta down">↓ ${compta.nb_depenses} opération(s)</div>
         </div>
         <div class="kpi-card" style="border-color:${compta.resultat_net >= 0 ? "rgba(99,153,34,0.3)" : "rgba(226,75,74,0.3)"};">
-          <div class="kpi-label">Résultat net ${yr}</div>
+          <div class="kpi-label">Résultat net ${escapeHtml(comptaPeriodShort)}</div>
           <div class="kpi-value" style="font-size:16px; color:${compta.resultat_net >= 0 ? "var(--green)" : "var(--red)"};">
             ${fmt.compact(compta.resultat_net)} <span class="kpi-sub">FCFA</span>
           </div>
@@ -246,14 +258,14 @@ export async function renderHome(root) {
           </div>
         </div>
         <div class="app-card">
-          <div class="card-header"><div class="card-title">Top 5 Clients</div><span class="card-badge">${yr}</span></div>
+          <div class="card-header"><div class="card-title">Top 5 Clients</div><span class="card-badge">${escapeHtml(blPeriod)}</span></div>
           <div id="donut-chart" style="min-height:260px;"></div>
         </div>
       </div>
 
       <!-- Top clients table -->
       <div class="app-card">
-        <div class="card-header"><div class="card-title">Top Consignataires — CA ${yr}</div><span class="card-badge">${topClients?.length || 0} clients</span></div>
+        <div class="card-header"><div class="card-title">Top Consignataires — CA ${escapeHtml(blPeriod)}</div><span class="card-badge">${topClients?.length || 0} clients</span></div>
         <table class="data-table w-full">
           <thead><tr><th>#</th><th>CLIENT</th><th>CA TOTAL</th><th>B/L</th><th>PART %</th><th>PERFORMANCE</th></tr></thead>
           <tbody>

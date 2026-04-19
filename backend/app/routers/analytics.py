@@ -176,12 +176,15 @@ async def get_ca_mensuel(
 @router.get("/ca-par-client", response_model=list[CaParClientRow])
 async def get_ca_par_client(
     annee: int | None = Query(None),
+    mois_num: int | None = Query(None),
     limit: int = Query(10, ge=1, le=50),
     db: AsyncSession = Depends(get_db),
 ) -> list[CaParClientRow]:
     filters = [Connaissement.client_id.isnot(None)]
     if annee is not None:
         filters.append(Connaissement.annee == annee)
+    if mois_num is not None:
+        filters.append(Connaissement.mois_num == mois_num)
 
     rows = (
         await db.execute(
@@ -215,12 +218,15 @@ async def get_ca_par_client(
 @router.get("/ca-par-navire", response_model=list[CaParNavireRow])
 async def get_ca_par_navire(
     annee: int | None = Query(None),
+    mois_num: int | None = Query(None),
     limit: int = Query(12, ge=1, le=50),
     db: AsyncSession = Depends(get_db),
 ) -> list[CaParNavireRow]:
     filters = [Connaissement.navire_id.isnot(None)]
     if annee is not None:
         filters.append(Connaissement.annee == annee)
+    if mois_num is not None:
+        filters.append(Connaissement.mois_num == mois_num)
 
     rows = (
         await db.execute(
