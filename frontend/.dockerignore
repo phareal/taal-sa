@@ -1,0 +1,11 @@
+# Frontend .dockerignore
+node_modules/
+.nuxt/
+.output/
+dist/
+.env
+*.env
+.git
+.gitignore
+*.log
+README.md

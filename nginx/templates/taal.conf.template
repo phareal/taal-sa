@@ -1,0 +1,117 @@
+# ─────────────────────────────────────────────────────────────────
+# taal.conf.template — Virtual host TAAL Dashboard
+# Variables injectées via envsubst au démarrage du conteneur :
+#   DOMAIN      (défaut : localhost)
+#   SSL_CERT    (défaut : /etc/nginx/certs/localhost.crt)
+#   SSL_KEY     (défaut : /etc/nginx/certs/localhost.key)
+# ─────────────────────────────────────────────────────────────────
+
+# Upstream Backend FastAPI
+upstream taal_backend {
+    server backend:8000;
+    keepalive 32;
+}
+
+# Upstream Frontend Nuxt.js
+upstream taal_frontend {
+    server frontend:3000;
+    keepalive 16;
+}
+
+# ── Redirection HTTP → HTTPS ──────────────────────────────────────
+server {
+    listen 80;
+    server_name ${DOMAIN};
+
+    # Challenge Let's Encrypt (certbot)
+    location /.well-known/acme-challenge/ {
+        root /var/www/certbot;
+    }
+
+    location / {
+        return 301 https://$$host$$request_uri;
+    }
+}
+
+# ── HTTPS principal ───────────────────────────────────────────────
+server {
+    listen 443 ssl;
+    http2  on;
+    server_name ${DOMAIN};
+
+    ssl_certificate     ${SSL_CERT};
+    ssl_certificate_key ${SSL_KEY};
+
+    ssl_protocols       TLSv1.2 TLSv1.3;
+    ssl_ciphers         HIGH:!aNULL:!MD5;
+    ssl_session_cache   shared:SSL:10m;
+    ssl_session_timeout 10m;
+
+    add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
+
+    # ── API Backend (/api/*) ──────────────────────────────────────
+    location /api/ {
+        limit_req zone=api burst=50 nodelay;
+
+        proxy_pass         http://taal_backend/api/;
+        proxy_http_version 1.1;
+        proxy_set_header   Connection        "";
+        proxy_set_header   Host              $$host;
+        proxy_set_header   X-Real-IP         $$remote_addr;
+        proxy_set_header   X-Forwarded-For   $$proxy_add_x_forwarded_for;
+        proxy_set_header   X-Forwarded-Proto $$scheme;
+
+        proxy_connect_timeout 30s;
+        proxy_send_timeout    60s;
+        proxy_read_timeout    60s;
+    }
+
+    # ── Upload Excel (limite + rate) ──────────────────────────────
+    location /api/import/ {
+        limit_req zone=upload burst=3 nodelay;
+        client_max_body_size 55M;
+
+        proxy_pass         http://taal_backend/api/import/;
+        proxy_http_version 1.1;
+        proxy_set_header   Host            $$host;
+        proxy_set_header   X-Real-IP       $$remote_addr;
+        proxy_set_header   X-Forwarded-For $$proxy_add_x_forwarded_for;
+        proxy_read_timeout 120s;
+    }
+
+    # ── Swagger / Redoc (doc API) ─────────────────────────────────
+    location ~ ^/(docs|redoc|openapi.json) {
+        proxy_pass         http://taal_backend;
+        proxy_http_version 1.1;
+        proxy_set_header   Host $$host;
+    }
+
+    # ── Frontend Nuxt.js (tout le reste) ──────────────────────────
+    location / {
+        proxy_pass         http://taal_frontend;
+        proxy_http_version 1.1;
+        proxy_set_header   Upgrade    $$http_upgrade;
+        proxy_set_header   Connection "upgrade";
+        proxy_set_header   Host       $$host;
+        proxy_set_header   X-Real-IP  $$remote_addr;
+        proxy_cache_bypass $$http_upgrade;
+
+        proxy_connect_timeout 30s;
+        proxy_read_timeout    60s;
+    }
+
+    # ── Assets statiques Nuxt (cache long) ───────────────────────
+    location /_nuxt/ {
+        proxy_pass http://taal_frontend/_nuxt/;
+        proxy_http_version 1.1;
+        proxy_set_header Host $$host;
+        add_header Cache-Control "public, max-age=31536000, immutable";
+    }
+
+    # ── Health check Nginx ────────────────────────────────────────
+    location /nginx-health {
+        access_log off;
+        return 200 "OK\n";
+        add_header Content-Type text/plain;
+    }
+}

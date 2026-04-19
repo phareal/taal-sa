@@ -1,0 +1,61 @@
+version: "3.9"
+
+# ─────────────────────────────────────────────────────────────────
+# Override DEV — docker compose -f docker-compose.yml -f docker-compose.dev.yml up
+# Ou simplement : make dev
+# ─────────────────────────────────────────────────────────────────
+
+services:
+
+  postgres:
+    ports:
+      - "5432:5432"   # exposé pour accès depuis l'IDE
+
+  redis:
+    ports:
+      - "6379:6379"
+
+  backend:
+    build:
+      target: development
+    command: >
+      uvicorn app.main:app
+        --host 0.0.0.0
+        --port 8000
+        --reload
+        --reload-dir /app/app
+        --log-level debug
+    environment:
+      ENVIRONMENT: development
+      LOG_LEVEL: debug
+      CORS_ORIGINS: "http://localhost:3000,http://127.0.0.1:3000"
+    volumes:
+      - ./backend:/app   # hot-reload : tout le backend monté en écriture
+      - /app/__pycache__
+      - /app/.venv
+    ports:
+      - "8000:8000"
+
+  frontend:
+    build:
+      target: development
+    command: ["npm", "run", "dev", "--", "--host", "0.0.0.0"]
+    environment:
+      NUXT_PUBLIC_API_BASE: "http://localhost:8000"
+      NODE_ENV: development
+    volumes:
+      - ./frontend:/app          # hot-reload Nuxt
+      - /app/node_modules        # évite d'écraser node_modules du conteneur
+      - /app/.nuxt
+      - /app/.output
+    ports:
+      - "3000:3000"
+      - "24678:24678"            # Nuxt HMR websocket
+
+  # Nginx désactivé en dev (accès direct aux ports)
+  nginx:
+    profiles: ["production"]
+
+  # Migrations lancées automatiquement au démarrage en dev
+  migrate:
+    restart: on-failure
